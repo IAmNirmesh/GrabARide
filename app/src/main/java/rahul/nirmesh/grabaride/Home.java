@@ -15,6 +15,9 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.firebase.geofire.GeoFire;
@@ -29,6 +32,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -36,6 +40,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+
+import rahul.nirmesh.grabaride.helper.CustomInfoWindow;
 
 public class Home extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
@@ -64,6 +70,11 @@ public class Home extends AppCompatActivity
     GeoFire geoFire;
     Marker mUserMarker;
 
+    // BottomSheet
+    ImageView imgExpandable;
+    BottomSheetRiderFragment mBottomSheetRiderFragment;
+    Button btnPickupRequest;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -87,6 +98,23 @@ public class Home extends AppCompatActivity
         // Geo Fire
         riders = FirebaseDatabase.getInstance().getReference("Drivers");
         geoFire = new GeoFire(riders);
+
+        mBottomSheetRiderFragment = BottomSheetRiderFragment.newInstance("Rider Bottom Sheet");
+        imgExpandable = findViewById(R.id.imgExpandable);
+        imgExpandable.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mBottomSheetRiderFragment.show(getSupportFragmentManager(), mBottomSheetRiderFragment.getTag());
+            }
+        });
+
+        btnPickupRequest = findViewById(R.id.btnPickupRequest);
+        btnPickupRequest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                requestPickupHere(FirebaseAuth.getInstance().getCurrentUser().getUid());
+            }
+        });
 
         setUpLocation();
     }
@@ -166,6 +194,9 @@ public class Home extends AppCompatActivity
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        mMap.getUiSettings().setZoomControlsEnabled(true);
+        mMap.getUiSettings().setZoomGesturesEnabled(true);
+        mMap.setInfoWindowAdapter(new CustomInfoWindow(this));
     }
 
     @Override
@@ -280,5 +311,23 @@ public class Home extends AppCompatActivity
         }
 
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+    }
+
+    private void requestPickupHere(String uid) {
+        DatabaseReference dbRequest = FirebaseDatabase.getInstance().getReference("PickupRequest");
+        GeoFire mGeoFire = new GeoFire(dbRequest);
+        mGeoFire.setLocation(uid, new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+
+        if (mUserMarker.isVisible())
+            mUserMarker.remove();
+
+        //  Add New Marker
+        mUserMarker = mMap.addMarker(new MarkerOptions().title("Pickup Here")
+                            .snippet("")
+                            .position(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()))
+                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
+        mUserMarker.showInfoWindow();
+
+        btnPickupRequest.setText("Getting your Driver...");
     }
 }
