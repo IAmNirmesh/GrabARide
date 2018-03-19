@@ -22,6 +22,8 @@ import android.widget.Toast;
 
 import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
+import com.firebase.geofire.GeoQuery;
+import com.firebase.geofire.GeoQueryEventListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -37,11 +39,15 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
+import rahul.nirmesh.grabaride.common.Common;
 import rahul.nirmesh.grabaride.helper.CustomInfoWindow;
+import rahul.nirmesh.grabaride.model.Rider;
 
 public class Home extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
@@ -75,6 +81,12 @@ public class Home extends AppCompatActivity
     BottomSheetRiderFragment mBottomSheetRiderFragment;
     Button btnPickupRequest;
 
+    boolean isDriverFound = false;
+    String driverId = "";
+    int radius = 1; // 1 KM
+    int distance = 1; // 1 KM
+    private static final int LIMIT = 3;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -94,10 +106,6 @@ public class Home extends AppCompatActivity
         // Map
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
-        // Geo Fire
-        riders = FirebaseDatabase.getInstance().getReference("Drivers");
-        geoFire = new GeoFire(riders);
 
         mBottomSheetRiderFragment = BottomSheetRiderFragment.newInstance("Rider Bottom Sheet");
         imgExpandable = findViewById(R.id.imgExpandable);
@@ -281,27 +289,85 @@ public class Home extends AppCompatActivity
             final double latitude = mLastLocation.getLatitude();
             final double longitude = mLastLocation.getLongitude();
 
-            // Update to Firebase
-            geoFire.setLocation(FirebaseAuth.getInstance().getCurrentUser().getUid(),
-                    new GeoLocation(latitude, longitude),
-                    new GeoFire.CompletionListener() {
-                        @Override
-                        public void onComplete(String key, DatabaseError error) {
-                            // Add Marker
-                            if (mUserMarker != null)
-                                mUserMarker.remove(); // Remove the Current State
-                            mUserMarker = mMap.addMarker(new MarkerOptions()
-                                    .position(new LatLng(latitude, longitude))
-                                    .title("You"));
+            // Add Marker
+            if (mUserMarker != null)
+                mUserMarker.remove(); // Remove the Current State
 
-                            // Move Camera to this Current Marker Location
-                            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(latitude, longitude), 15.0f));
-                        }
-                    });
+            mUserMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title("You"));
+
+            // Move Camera to this Current Marker Location
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(latitude, longitude), 15.0f));
+
+            loadAllAvailableDrivers();
+
             Log.d("CURRENT-LOCATION: ", String.format("Your Location was changed: %f / %f", latitude, longitude));
         } else {
             Log.d("ERROR-LOCATION: ", "Cannot Get Your Location.");
         }
+    }
+
+    private void loadAllAvailableDrivers() {
+        // Load All Available Drivers in the Distance of 3 KM
+        DatabaseReference driverLocation = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
+        GeoFire mGeoFireDriverLocation = new GeoFire(driverLocation);
+
+        GeoQuery geoQuery = mGeoFireDriverLocation.queryAtLocation(
+                new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), distance);
+
+        geoQuery.removeAllListeners();
+        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+            @Override
+            public void onKeyEntered(String key, final GeoLocation location) {
+                // Use key to get the Email from table "Users"
+                FirebaseDatabase.getInstance().getReference(Common.user_driver_tbl)
+                        .child(key)
+                        .addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(DataSnapshot dataSnapshot) {
+                                // Because Rider & Users model are exactly same
+                                // So we can use Rider's model to fetch User's information
+                                Rider rider = dataSnapshot.getValue(Rider.class);
+
+                                // Add Driver to Map
+                                mMap.addMarker(new MarkerOptions()
+                                        .position(new LatLng(location.latitude, location.longitude))
+                                        .flat(true)
+                                        .title(rider.getName())
+                                        .snippet("Phone: " + rider.getPhone())
+                                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.car)));
+
+                            }
+
+                            @Override
+                            public void onCancelled(DatabaseError databaseError) {
+
+                            }
+                        });
+            }
+
+            @Override
+            public void onKeyExited(String key) {
+
+            }
+
+            @Override
+            public void onKeyMoved(String key, GeoLocation location) {
+
+            }
+
+            @Override
+            public void onGeoQueryReady() {
+                if (distance <= LIMIT) {
+                    distance++;
+                    loadAllAvailableDrivers();
+                }
+            }
+
+            @Override
+            public void onGeoQueryError(DatabaseError error) {
+
+            }
+        });
     }
 
     private void startLocationUpdates() {
@@ -314,7 +380,7 @@ public class Home extends AppCompatActivity
     }
 
     private void requestPickupHere(String uid) {
-        DatabaseReference dbRequest = FirebaseDatabase.getInstance().getReference("PickupRequest");
+        DatabaseReference dbRequest = FirebaseDatabase.getInstance().getReference(Common.pickup_request_tbl);
         GeoFire mGeoFire = new GeoFire(dbRequest);
         mGeoFire.setLocation(uid, new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
 
@@ -329,5 +395,53 @@ public class Home extends AppCompatActivity
         mUserMarker.showInfoWindow();
 
         btnPickupRequest.setText("Getting your Driver...");
+
+        findAvailableDrivers();
+    }
+
+    private void findAvailableDrivers() {
+        DatabaseReference drivers = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
+        GeoFire mGeoFireDrivers = new GeoFire(drivers);
+
+        GeoQuery geoQuery = mGeoFireDrivers.queryAtLocation(
+                new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), radius);
+
+        geoQuery.removeAllListeners();
+        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+            @Override
+            public void onKeyEntered(String key, GeoLocation location) {
+                // If Driver Found
+                if (!isDriverFound) {
+                    isDriverFound = true;
+                    driverId = key;
+                    btnPickupRequest.setText("CALL DRIVER");
+                    Toast.makeText(Home.this, "" + key, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onKeyExited(String key) {
+
+            }
+
+            @Override
+            public void onKeyMoved(String key, GeoLocation location) {
+
+            }
+
+            @Override
+            public void onGeoQueryReady() {
+                // If Driver is not Available in given 1 KM then increase the Search Area
+                if (!isDriverFound) {
+                    radius++;
+                    findAvailableDrivers();
+                }
+            }
+
+            @Override
+            public void onGeoQueryError(DatabaseError error) {
+
+            }
+        });
     }
 }
