@@ -1,5 +1,8 @@
 package rahul.nirmesh.grabaride.common;
 
+import rahul.nirmesh.grabaride.remote.FCMClient;
+import rahul.nirmesh.grabaride.remote.IFCMService;
+
 /**
  * Created by NIRMESH on 19-Mar-18.
  */
@@ -9,4 +12,11 @@ public class Common {
     public static final String user_driver_tbl = "DriversInformation";
     public static final String user_rider_tbl = "RidersInformation";
     public static final String pickup_request_tbl = "PickupRequest";
+    public static final String token_tbl = "Tokens";
+
+    public static final String fcmURL = "https://fcm.googleapis.com/";
+
+    public static IFCMService getFCMService() {
+        return FCMClient.getClient(fcmURL).create(IFCMService.class);
+    }
 }
