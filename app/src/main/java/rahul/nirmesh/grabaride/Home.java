@@ -70,7 +70,6 @@ public class Home extends AppCompatActivity
 
     private GoogleMap mMap;
 
-    // PLAY SERVICES
     private static final int MY_PERMISSION_REQUEST_CODE = 1000;
     private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 1001;
 
@@ -86,7 +85,6 @@ public class Home extends AppCompatActivity
     GeoFire geoFire;
     Marker mUserMarker;
 
-    // BottomSheet
     ImageView imgExpandable;
     BottomSheetRiderFragment mBottomSheetRiderFragment;
     Button btnPickupRequest;
@@ -98,6 +96,8 @@ public class Home extends AppCompatActivity
     private static final int LIMIT = 3;
 
     IFCMService mService;
+
+    DatabaseReference driversAvailable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,7 +117,6 @@ public class Home extends AppCompatActivity
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        // Map
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
@@ -305,6 +304,19 @@ public class Home extends AppCompatActivity
 
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         if (mLastLocation != null) {
+            driversAvailable = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
+            driversAvailable.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    loadAllAvailableDrivers();
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                }
+            });
+
             final double latitude = mLastLocation.getLatitude();
             final double longitude = mLastLocation.getLongitude();
 
@@ -326,7 +338,11 @@ public class Home extends AppCompatActivity
     }
 
     private void loadAllAvailableDrivers() {
-        // Load All Available Drivers in the Distance of 3 KM
+        mMap.clear();
+
+        mMap.addMarker(new MarkerOptions().position(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()))
+                .title("You"));
+
         DatabaseReference driverLocation = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
         GeoFire mGeoFireDriverLocation = new GeoFire(driverLocation);
 
