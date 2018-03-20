@@ -491,7 +491,10 @@ public class Home extends AppCompatActivity
                             Token token = postSnapshot.getValue(Token.class);
 
                             String json_lat_lng = new Gson().toJson(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
-                            Notification data = new Notification("NIRMESH", json_lat_lng);
+                            String riderToken = FirebaseInstanceId.getInstance().getToken();
+
+                            Notification data = new Notification(riderToken, json_lat_lng);
+
                             Sender sender = new Sender(token.getToken(), data);
 
                             mService.sendMessage(sender).enqueue(new Callback<FCMResponse>() {
