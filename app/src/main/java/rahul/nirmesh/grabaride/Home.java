@@ -27,9 +27,13 @@ import com.firebase.geofire.GeoQueryEventListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
+import com.google.android.gms.location.places.ui.PlaceSelectionListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -99,6 +103,10 @@ public class Home extends AppCompatActivity
 
     DatabaseReference driversAvailable;
 
+    PlaceAutocompleteFragment place_location, place_destination;
+
+    String mPlaceLocation, mPlaceDestination;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,14 +128,7 @@ public class Home extends AppCompatActivity
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
-        mBottomSheetRiderFragment = BottomSheetRiderFragment.newInstance("Rider Bottom Sheet");
         imgExpandable = findViewById(R.id.imgExpandable);
-        imgExpandable.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mBottomSheetRiderFragment.show(getSupportFragmentManager(), mBottomSheetRiderFragment.getTag());
-            }
-        });
 
         btnPickupRequest = findViewById(R.id.btnPickupRequest);
         btnPickupRequest.setOnClickListener(new View.OnClickListener() {
@@ -137,6 +138,51 @@ public class Home extends AppCompatActivity
                     requestPickupHere(FirebaseAuth.getInstance().getCurrentUser().getUid());
                 else
                     sendRequestToDriver(driverId);
+            }
+        });
+
+        place_location = (PlaceAutocompleteFragment) getFragmentManager().findFragmentById(R.id.place_location);
+        place_destination = (PlaceAutocompleteFragment) getFragmentManager().findFragmentById(R.id.place_destination);
+
+        place_location.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                mPlaceLocation = place.getAddress().toString();
+
+                mMap.clear();
+
+                mUserMarker = mMap.addMarker(new MarkerOptions()
+                                                            .position(place.getLatLng())
+                                                            .icon(BitmapDescriptorFactory.defaultMarker())
+                                                            .title("Pickup Here."));
+
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
+            }
+
+            @Override
+            public void onError(Status status) {
+
+            }
+        });
+
+        place_destination.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                mPlaceDestination = place.getAddress().toString();
+
+                mMap.addMarker(new MarkerOptions()
+                                            .position(place.getLatLng())
+                                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
+
+                BottomSheetRiderFragment mBottomSheet = BottomSheetRiderFragment.newInstance(mPlaceLocation, mPlaceDestination);
+                mBottomSheet.show(getSupportFragmentManager(), mBottomSheet.getTag());
+            }
+
+            @Override
+            public void onError(Status status) {
+
             }
         });
 
@@ -308,7 +354,7 @@ public class Home extends AppCompatActivity
             driversAvailable.addValueEventListener(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
-                    loadAllAvailableDrivers();
+                    loadAllAvailableDrivers(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
                 }
 
                 @Override
@@ -329,7 +375,7 @@ public class Home extends AppCompatActivity
             // Move Camera to this Current Marker Location
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(latitude, longitude), 15.0f));
 
-            loadAllAvailableDrivers();
+            loadAllAvailableDrivers(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
 
             Log.d("CURRENT-LOCATION: ", String.format("Your Location was changed: %f / %f", latitude, longitude));
         } else {
@@ -337,17 +383,16 @@ public class Home extends AppCompatActivity
         }
     }
 
-    private void loadAllAvailableDrivers() {
+    private void loadAllAvailableDrivers(final LatLng location) {
         mMap.clear();
 
-        mMap.addMarker(new MarkerOptions().position(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()))
-                .title("You"));
+        mMap.addMarker(new MarkerOptions().position(location).title("You"));
 
         DatabaseReference driverLocation = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
         GeoFire mGeoFireDriverLocation = new GeoFire(driverLocation);
 
         GeoQuery geoQuery = mGeoFireDriverLocation.queryAtLocation(
-                new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), distance);
+                new GeoLocation(location.latitude, location.longitude), distance);
 
         geoQuery.removeAllListeners();
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
@@ -394,7 +439,7 @@ public class Home extends AppCompatActivity
             public void onGeoQueryReady() {
                 if (distance <= LIMIT) {
                     distance++;
-                    loadAllAvailableDrivers();
+                    loadAllAvailableDrivers(location);
                 }
             }
 
@@ -445,12 +490,10 @@ public class Home extends AppCompatActivity
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
             @Override
             public void onKeyEntered(String key, GeoLocation location) {
-                // If Driver Found
                 if (!isDriverFound) {
                     isDriverFound = true;
                     driverId = key;
                     btnPickupRequest.setText("CALL DRIVER");
-                    Toast.makeText(Home.this, "" + key, Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -466,10 +509,12 @@ public class Home extends AppCompatActivity
 
             @Override
             public void onGeoQueryReady() {
-                // If Driver is not Available in given 1 KM then increase the Search Area
-                if (!isDriverFound) {
+                if (!isDriverFound && radius < LIMIT) {
                     radius++;
                     findAvailableDrivers();
+                } else {
+                    Toast.makeText(Home.this, "No Driver Available new You.", Toast.LENGTH_SHORT).show();
+                    btnPickupRequest.setText("REQUEST PICKUP");
                 }
             }
 
