@@ -31,6 +31,7 @@ import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.AutocompleteFilter;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
 import com.google.android.gms.location.places.ui.PlaceSelectionListener;
@@ -40,6 +41,7 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.firebase.auth.FirebaseAuth;
@@ -50,6 +52,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.gson.Gson;
+import com.google.maps.android.SphericalUtil;
 
 import rahul.nirmesh.grabaride.common.Common;
 import rahul.nirmesh.grabaride.helper.CustomInfoWindow;
@@ -105,6 +108,8 @@ public class Home extends AppCompatActivity
 
     PlaceAutocompleteFragment place_location, place_destination;
 
+    AutocompleteFilter typeFilter;
+
     String mPlaceLocation, mPlaceDestination;
 
     @Override
@@ -143,6 +148,11 @@ public class Home extends AppCompatActivity
 
         place_location = (PlaceAutocompleteFragment) getFragmentManager().findFragmentById(R.id.place_location);
         place_destination = (PlaceAutocompleteFragment) getFragmentManager().findFragmentById(R.id.place_destination);
+
+        typeFilter = new AutocompleteFilter.Builder()
+                                    .setTypeFilter(AutocompleteFilter.TYPE_FILTER_ADDRESS)
+                                    .setTypeFilter(3)
+                                    .build();
 
         place_location.setOnPlaceSelectedListener(new PlaceSelectionListener() {
             @Override
@@ -350,6 +360,22 @@ public class Home extends AppCompatActivity
 
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         if (mLastLocation != null) {
+            LatLng center = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+            // Heading: 0 - NorthSide, 90 - EastSide, 180 - SouthSide, 270 - WestSide
+            LatLng northSide = SphericalUtil.computeOffset(center, 100000, 0);
+            LatLng southSide = SphericalUtil.computeOffset(center, 100000, 180);
+
+            LatLngBounds bounds = LatLngBounds.builder()
+                                            .include(northSide)
+                                            .include(southSide)
+                                            .build();
+
+            place_location.setBoundsBias(bounds);
+            place_location.setFilter(typeFilter);
+
+            place_destination.setBoundsBias(bounds);
+            place_destination.setFilter(typeFilter);
+
             driversAvailable = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
             driversAvailable.addValueEventListener(new ValueEventListener() {
                 @Override
