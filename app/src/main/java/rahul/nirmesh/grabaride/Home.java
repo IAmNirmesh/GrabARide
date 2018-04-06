@@ -88,12 +88,9 @@ public class Home extends AppCompatActivity
     private GoogleApiClient mGoogleApiClient;
     private Location mLastLocation;
 
-    DatabaseReference riders;
-    GeoFire geoFire;
-    Marker mUserMarker;
+    Marker mUserMarker, markerDestination;
 
     ImageView imgExpandable;
-    BottomSheetRiderFragment mBottomSheetRiderFragment;
     Button btnPickupRequest;
 
     boolean isDriverFound = false;
@@ -186,7 +183,7 @@ public class Home extends AppCompatActivity
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
 
-                BottomSheetRiderFragment mBottomSheet = BottomSheetRiderFragment.newInstance(mPlaceLocation, mPlaceDestination);
+                BottomSheetRiderFragment mBottomSheet = BottomSheetRiderFragment.newInstance(mPlaceLocation, mPlaceDestination, false);
                 mBottomSheet.show(getSupportFragmentManager(), mBottomSheet.getTag());
             }
 
@@ -279,6 +276,27 @@ public class Home extends AppCompatActivity
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setZoomGesturesEnabled(true);
         mMap.setInfoWindowAdapter(new CustomInfoWindow(this));
+
+        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                if (markerDestination != null)
+                    markerDestination.remove();
+
+                markerDestination = mMap.addMarker(new MarkerOptions()
+                                                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_VIOLET))
+                                                                .position(latLng)
+                                                                .title("Destination"));
+
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15.0f));
+
+                BottomSheetRiderFragment mBottomSheet = BottomSheetRiderFragment.newInstance(
+                                                                    String.format("%f, %f", mLastLocation.getLatitude(), mLastLocation.getLongitude()),
+                                                                    String.format("%f, %f", latLng.latitude, latLng.longitude),
+                                                                    true);
+                mBottomSheet.show(getSupportFragmentManager(), mBottomSheet.getTag());
+            }
+        });
     }
 
     @Override
