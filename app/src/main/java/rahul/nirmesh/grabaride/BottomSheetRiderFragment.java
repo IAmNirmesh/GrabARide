@@ -3,10 +3,21 @@ package rahul.nirmesh.grabaride;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.design.widget.BottomSheetDialogFragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import rahul.nirmesh.grabaride.common.Common;
+import rahul.nirmesh.grabaride.remote.IGoogleAPI;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * Created by NIRMESH on 19-Mar-18.
@@ -14,6 +25,10 @@ import android.widget.TextView;
 
 public class BottomSheetRiderFragment extends BottomSheetDialogFragment {
     String mLocation, mDestination;
+
+    IGoogleAPI mService;
+
+    TextView txtCalculate;
 
     public static BottomSheetRiderFragment newInstance (String location, String destination) {
         BottomSheetRiderFragment f = new BottomSheetRiderFragment();
@@ -38,11 +53,68 @@ public class BottomSheetRiderFragment extends BottomSheetDialogFragment {
 
         TextView txtLocation = view.findViewById(R.id.txtLocation);
         TextView txtDestination = view.findViewById(R.id.txtDestination);
-        TextView txtCalculate = view.findViewById(R.id.txtCalculate);
+        txtCalculate = view.findViewById(R.id.txtCalculate);
+
+        mService = Common.getGoogleService();
+
+        getTotalFare(mLocation, mDestination);
 
         txtLocation.setText(mLocation);
         txtDestination.setText(mDestination);
 
         return view;
+    }
+
+    private void getTotalFare(String mLocation, String mDestination) {
+        String requestUrl = null;
+
+        try {
+            requestUrl = "https://maps.googleapis.com/maps/api/directions/json?"
+                        + "mode-driving&"
+                        + "transit_routing_preference=less_driving&"
+                        + "origin=" + mLocation + "&"
+                        + "destination=" + mDestination + "&"
+                        + "key=" + getResources().getString(R.string.google_browser_key);
+
+            Log.e("LINK: ", requestUrl);
+
+            mService.getPath(requestUrl).enqueue(new Callback<String>() {
+                @Override
+                public void onResponse(Call<String> call, Response<String> response) {
+                    try {
+                        JSONObject jsonObject = new JSONObject(response.body().toString());
+                        JSONArray routes = jsonObject.getJSONArray("routes");
+
+                        JSONObject object = routes.getJSONObject(0);
+                        JSONArray legs = object.getJSONArray("legs");
+
+                        JSONObject legsObject = legs.getJSONObject(0);
+
+                        JSONObject distance = legsObject.getJSONObject("distance");
+                        String distance_text = distance.getString("text");
+                        Double distance_value = Double.parseDouble(distance_text.replaceAll("[^0-9\\\\.]", ""));
+
+                        JSONObject duration = legsObject.getJSONObject("duration");
+                        String duration_text = duration.getString("text");
+                        Integer duration_value = Integer.parseInt(duration_text.replaceAll("\\D+", ""));
+
+                        String final_calculated_fare = String.format("%s + %s = $%.2f",
+                                                            distance_text, duration_text,
+                                                            Common.getPrice(distance_value, duration_value));
+
+                        txtCalculate.setText(final_calculated_fare);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<String> call, Throwable t) {
+                    Log.e("ERROR: ", t.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
