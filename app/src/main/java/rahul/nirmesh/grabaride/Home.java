@@ -1,6 +1,7 @@
 package rahul.nirmesh.grabaride;
 
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -42,6 +43,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.firebase.auth.FirebaseAuth;
@@ -160,7 +162,7 @@ public class Home extends AppCompatActivity
 
                 mUserMarker = mMap.addMarker(new MarkerOptions()
                                                             .position(place.getLatLng())
-                                                            .icon(BitmapDescriptorFactory.defaultMarker())
+                                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
                                                             .title("Pickup Here."));
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
@@ -179,7 +181,8 @@ public class Home extends AppCompatActivity
 
                 mMap.addMarker(new MarkerOptions()
                                             .position(place.getLatLng())
-                                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.destination_marker))
+                                            .title("Destination"));
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
 
@@ -272,6 +275,16 @@ public class Home extends AppCompatActivity
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
+
+        try {
+            boolean isSuccess = googleMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(this, R.raw.uber_style_map));
+
+            if (!isSuccess)
+                Log.e("ERROR: ", "Map Style Loading Failed!!!");
+        } catch (Resources.NotFoundException e) {
+            e.printStackTrace();
+        }
+
         mMap = googleMap;
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setZoomGesturesEnabled(true);
@@ -284,9 +297,9 @@ public class Home extends AppCompatActivity
                     markerDestination.remove();
 
                 markerDestination = mMap.addMarker(new MarkerOptions()
-                                                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_VIOLET))
-                                                                .position(latLng)
-                                                                .title("Destination"));
+                                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.destination_marker))
+                                                            .position(latLng)
+                                                            .title("Destination"));
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15.0f));
 
@@ -410,15 +423,6 @@ public class Home extends AppCompatActivity
             final double latitude = mLastLocation.getLatitude();
             final double longitude = mLastLocation.getLongitude();
 
-            // Add Marker
-            if (mUserMarker != null)
-                mUserMarker.remove(); // Remove the Current State
-
-            mUserMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title("You"));
-
-            // Move Camera to this Current Marker Location
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(latitude, longitude), 15.0f));
-
             loadAllAvailableDrivers(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
 
             Log.d("CURRENT-LOCATION: ", String.format("Your Location was changed: %f / %f", latitude, longitude));
@@ -430,7 +434,12 @@ public class Home extends AppCompatActivity
     private void loadAllAvailableDrivers(final LatLng location) {
         mMap.clear();
 
-        mMap.addMarker(new MarkerOptions().position(location).title("You"));
+        mUserMarker = mMap.addMarker(new MarkerOptions()
+                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                                            .position(location)
+                                            .title("You"));
+
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(location, 15.0f));
 
         DatabaseReference driverLocation = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
         GeoFire mGeoFireDriverLocation = new GeoFire(driverLocation);
