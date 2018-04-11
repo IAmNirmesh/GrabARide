@@ -1,5 +1,6 @@
 package rahul.nirmesh.grabaride;
 
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.location.Location;
@@ -56,6 +57,7 @@ import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.gson.Gson;
 import com.google.maps.android.SphericalUtil;
 
+import io.paperdb.Paper;
 import rahul.nirmesh.grabaride.common.Common;
 import rahul.nirmesh.grabaride.helper.CustomInfoWindow;
 import rahul.nirmesh.grabaride.model.FCMResponse;
@@ -252,8 +254,8 @@ public class Home extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_camera) {
-            // Handle the camera action
+        if (id == R.id.nav_signOut) {
+            signOut();
         } else if (id == R.id.nav_gallery) {
 
         } else if (id == R.id.nav_slideshow) {
@@ -626,5 +628,16 @@ public class Home extends AppCompatActivity
 
         Token token = new Token(FirebaseInstanceId.getInstance().getToken());
         tokens.child(FirebaseAuth.getInstance().getCurrentUser().getUid()).setValue(token);
+    }
+
+    private void signOut() {
+
+        Paper.init(this);
+        Paper.book().destroy();
+
+        FirebaseAuth.getInstance().signOut();
+        Intent intentSignOut = new Intent(Home.this, MainActivity.class);
+        startActivity(intentSignOut);
+        finish();
     }
 }

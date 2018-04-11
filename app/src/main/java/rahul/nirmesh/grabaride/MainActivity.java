@@ -23,11 +23,15 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.rengwuxian.materialedittext.MaterialEditText;
 
 import dmax.dialog.SpotsDialog;
+import io.paperdb.Paper;
 import rahul.nirmesh.grabaride.common.Common;
 import rahul.nirmesh.grabaride.model.Rider;
 import uk.co.chrisjenx.calligraphy.CalligraphyConfig;
@@ -60,6 +64,8 @@ public class MainActivity extends AppCompatActivity {
                 .build());
         setContentView(R.layout.activity_main);
 
+        Paper.init(this);
+
         auth = FirebaseAuth.getInstance();
         database = FirebaseDatabase.getInstance();
         users = database.getReference(Common.user_rider_tbl);
@@ -91,6 +97,15 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         });
+
+        String user = Paper.book().read(Common.user_field);
+        String password = Paper.book().read(Common.password_field);
+
+        if (user != null && password != null) {
+            if (!TextUtils.isEmpty(user) && !TextUtils.isEmpty(password)) {
+                autoLogin(user, password);
+            }
+        }
     }
 
     private void showRegisterDialog() {
@@ -228,6 +243,10 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void onSuccess(AuthResult authResult) {
                                 waitingDialog.dismiss();
+
+                                Paper.book().write(Common.user_field, loginEmail.getText().toString());
+                                Paper.book().write(Common.password_field, loginPassword.getText().toString());
+
                                 startActivity(new Intent(MainActivity.this, Home.class));
                                 finish();
                             }
@@ -300,6 +319,30 @@ public class MainActivity extends AppCompatActivity {
         });
 
         alertDialog.show();
+    }
+
+    private void autoLogin(String user, String password) {
+        final AlertDialog waitingDialog = new SpotsDialog(MainActivity.this);
+        waitingDialog.show();
+
+        auth.signInWithEmailAndPassword(user, password)
+                .addOnSuccessListener(new OnSuccessListener<AuthResult>() {
+                    @Override
+                    public void onSuccess(AuthResult authResult) {
+                        waitingDialog.dismiss();
+                        startActivity(new Intent(MainActivity.this, Home.class));
+                        finish();
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        waitingDialog.dismiss();
+                        Snackbar.make(rootLayout, "Failed " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
+
+                        btnSignIn.setEnabled(true);
+                    }
+                });
     }
 
     @Override

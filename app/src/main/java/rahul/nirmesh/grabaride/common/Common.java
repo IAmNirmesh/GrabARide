@@ -20,6 +20,9 @@ public class Common {
     public static final String token_tbl = "Tokens";
     public static final String rate_details_tbl = "RateDetails";
 
+    public static final String user_field = "rider_usr";
+    public static final String password_field = "rider_pwd";
+
     public static final String fcmURL = "https://fcm.googleapis.com/";
 
     public static IFCMService getFCMService() {

@@ -57,5 +57,7 @@ dependencies {
     implementation 'com.google.maps.android:android-maps-utils:0.5+'
 
     implementation 'me.zhanghai.android.materialratingbar:library:1.2.0'
+
+    implementation 'io.paperdb:paperdb:2.6'
 }
 apply plugin: 'com.google.gms.google-services'
