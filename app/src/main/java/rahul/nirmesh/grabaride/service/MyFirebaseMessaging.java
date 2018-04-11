@@ -14,6 +14,7 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import rahul.nirmesh.grabaride.R;
+import rahul.nirmesh.grabaride.RateActivity;
 
 /**
  * Created by NIRMESH on 19-Mar-18.
@@ -35,6 +36,9 @@ public class MyFirebaseMessaging extends FirebaseMessagingService {
         else if (remoteMessage.getNotification().getTitle().equals("Arrived")) {
             showArrivedNotification(remoteMessage.getNotification().getBody());
         }
+        else if (remoteMessage.getNotification().getTitle().equals("DropOff")) {
+            openRateActivity(remoteMessage.getNotification().getBody());
+        }
     }
 
     private void showArrivedNotification(String body) {
@@ -53,5 +57,11 @@ public class MyFirebaseMessaging extends FirebaseMessagingService {
 
         NotificationManager manager = (NotificationManager) getBaseContext().getSystemService(Context.NOTIFICATION_SERVICE);
         manager.notify(1, builder.build());
+    }
+
+    private void openRateActivity(String body) {
+        Intent intent = new Intent(this, RateActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 }

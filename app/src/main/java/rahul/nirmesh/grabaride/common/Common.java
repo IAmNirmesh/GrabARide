@@ -10,11 +10,15 @@ import rahul.nirmesh.grabaride.remote.IGoogleAPI;
  */
 
 public class Common {
+    public static boolean isDriverFound = false;
+    public static String driverId = "";
+
     public static final String driver_tbl = "Drivers";
     public static final String user_driver_tbl = "DriversInformation";
     public static final String user_rider_tbl = "RidersInformation";
     public static final String pickup_request_tbl = "PickupRequest";
     public static final String token_tbl = "Tokens";
+    public static final String rate_details_tbl = "RateDetails";
 
     public static final String fcmURL = "https://fcm.googleapis.com/";
 
