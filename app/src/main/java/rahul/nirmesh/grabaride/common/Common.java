@@ -1,5 +1,6 @@
 package rahul.nirmesh.grabaride.common;
 
+import rahul.nirmesh.grabaride.model.Rider;
 import rahul.nirmesh.grabaride.remote.FCMClient;
 import rahul.nirmesh.grabaride.remote.GoogleMapsAPI;
 import rahul.nirmesh.grabaride.remote.IFCMService;
@@ -13,6 +14,8 @@ public class Common {
     public static boolean isDriverFound = false;
     public static String driverId = "";
 
+    public static Rider currentRider = new Rider();
+
     public static final String driver_tbl = "Drivers";
     public static final String user_driver_tbl = "DriversInformation";
     public static final String user_rider_tbl = "RidersInformation";
@@ -22,6 +25,8 @@ public class Common {
 
     public static final String user_field = "rider_usr";
     public static final String password_field = "rider_pwd";
+
+    public static final int PICK_IMAGE_REQUEST = 9999;
 
     public static final String fcmURL = "https://fcm.googleapis.com/";
 

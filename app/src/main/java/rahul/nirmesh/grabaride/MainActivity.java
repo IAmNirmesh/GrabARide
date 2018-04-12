@@ -150,19 +150,18 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                // Register New Users
                 auth.createUserWithEmailAndPassword(editEmail.getText().toString(), editPassword.getText().toString())
                         .addOnSuccessListener(new OnSuccessListener<AuthResult>() {
                             @Override
                             public void onSuccess(AuthResult authResult) {
-                                // Save User to DB
                                 Rider rider = new Rider();
                                 rider.setEmail(editEmail.getText().toString());
                                 rider.setName(editName.getText().toString());
                                 rider.setPhone(editPhone.getText().toString());
                                 rider.setPassword(editPassword.getText().toString());
+                                rider.setAvatarUrl("");
+                                rider.setRates("0");
 
-                                // Use Email as Key
                                 users.child(FirebaseAuth.getInstance().getCurrentUser().getUid()).setValue(rider)
                                         .addOnSuccessListener(new OnSuccessListener<Void>() {
                                             @Override
@@ -210,16 +209,13 @@ public class MainActivity extends AppCompatActivity {
 
         dialog.setView(login_layout);
 
-        // Set Button
         dialog.setPositiveButton("SIGN IN", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
                 dialogInterface.dismiss();
 
-                // Set disable button Sign In if it is processing
                 btnSignIn.setEnabled(false);
 
-                // Checking Validations
                 if (TextUtils.isEmpty(loginEmail.getText().toString())) {
                     Snackbar.make(rootLayout, "Please Enter Email Address.", Snackbar.LENGTH_SHORT).show();
                     return;
@@ -244,11 +240,26 @@ public class MainActivity extends AppCompatActivity {
                             public void onSuccess(AuthResult authResult) {
                                 waitingDialog.dismiss();
 
+                                FirebaseDatabase.getInstance().getReference(Common.user_rider_tbl)
+                                        .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                                        .addListenerForSingleValueEvent(new ValueEventListener() {
+                                            @Override
+                                            public void onDataChange(DataSnapshot dataSnapshot) {
+                                                Common.currentRider = dataSnapshot.getValue(Rider.class);
+
+                                                waitingDialog.dismiss();
+                                                startActivity(new Intent(MainActivity.this, Home.class));
+                                                finish();
+                                            }
+
+                                            @Override
+                                            public void onCancelled(DatabaseError databaseError) {
+
+                                            }
+                                        });
+
                                 Paper.book().write(Common.user_field, loginEmail.getText().toString());
                                 Paper.book().write(Common.password_field, loginPassword.getText().toString());
-
-                                startActivity(new Intent(MainActivity.this, Home.class));
-                                finish();
                             }
                         })
                         .addOnFailureListener(new OnFailureListener() {
@@ -330,8 +341,24 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(AuthResult authResult) {
                         waitingDialog.dismiss();
-                        startActivity(new Intent(MainActivity.this, Home.class));
-                        finish();
+
+                        FirebaseDatabase.getInstance().getReference(Common.user_rider_tbl)
+                                .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                                .addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        Common.currentRider = dataSnapshot.getValue(Rider.class);
+
+                                        waitingDialog.dismiss();
+                                        startActivity(new Intent(MainActivity.this, Home.class));
+                                        finish();
+                                    }
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+
+                                    }
+                                });
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {

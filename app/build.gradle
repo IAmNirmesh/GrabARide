@@ -51,6 +51,7 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.3.0'
     implementation 'com.squareup.retrofit2:converter-scalars:2.3.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.3.0'
+    implementation 'com.squareup.picasso:picasso:2.5.2'
 
     implementation 'com.google.code.gson:gson:2.8.2'
 
@@ -59,5 +60,7 @@ dependencies {
     implementation 'me.zhanghai.android.materialratingbar:library:1.2.0'
 
     implementation 'io.paperdb:paperdb:2.6'
+
+    implementation 'de.hdodenhof:circleimageview:2.2.0'
 }
 apply plugin: 'com.google.gms.google-services'

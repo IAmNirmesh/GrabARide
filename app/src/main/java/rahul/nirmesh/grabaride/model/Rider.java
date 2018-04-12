@@ -5,16 +5,18 @@ package rahul.nirmesh.grabaride.model;
  */
 
 public class Rider {
-    private String name, email, phone, password;
+    private String name, email, phone, password, avatarUrl, rates;
 
     public Rider() {
     }
 
-    public Rider(String name, String email, String phone, String password) {
+    public Rider(String name, String email, String phone, String password, String avatarUrl, String rates) {
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.password = password;
+        this.avatarUrl = avatarUrl;
+        this.rates = rates;
     }
 
     public String getName() {
@@ -47,5 +49,21 @@ public class Rider {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public String getRates() {
+        return rates;
+    }
+
+    public void setRates(String rates) {
+        this.rates = rates;
     }
 }
