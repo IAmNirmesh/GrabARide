@@ -9,8 +9,8 @@ import android.content.res.Resources;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Looper;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.view.GravityCompat;
@@ -33,12 +33,12 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.places.AutocompleteFilter;
 import com.google.android.gms.location.places.Place;
@@ -95,25 +95,22 @@ import retrofit2.Response;
 
 public class Home extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
-        OnMapReadyCallback,
-        GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+        OnMapReadyCallback {
 
     SupportMapFragment mapFragment;
+
+    FusedLocationProviderClient fusedLocationProviderClient;
+    LocationCallback locationCallback;
 
     private GoogleMap mMap;
 
     private static final int MY_PERMISSION_REQUEST_CODE = 1000;
-    private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 1001;
 
     private static int UPDATE_INTERVAL = 5000;
     private static int FASTEST_INTERVAL = 3000;
     private static int DISPLACEMENT = 10;
 
     private LocationRequest mLocationRequest;
-    private GoogleApiClient mGoogleApiClient;
-    private Location mLastLocation;
 
     Marker mUserMarker, markerDestination;
 
@@ -148,6 +145,8 @@ public class Home extends AppCompatActivity
         setSupportActionBar(toolbar);
 
         mService = Common.getFCMService();
+
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
 
         storage = FirebaseStorage.getInstance();
         storageReference = storage.getReference();
@@ -194,9 +193,9 @@ public class Home extends AppCompatActivity
         place_destination = (PlaceAutocompleteFragment) getFragmentManager().findFragmentById(R.id.place_destination);
 
         typeFilter = new AutocompleteFilter.Builder()
-                                    .setTypeFilter(AutocompleteFilter.TYPE_FILTER_ADDRESS)
-                                    .setTypeFilter(3)
-                                    .build();
+                .setTypeFilter(AutocompleteFilter.TYPE_FILTER_ADDRESS)
+                .setTypeFilter(3)
+                .build();
 
         place_location.setOnPlaceSelectedListener(new PlaceSelectionListener() {
             @Override
@@ -206,9 +205,9 @@ public class Home extends AppCompatActivity
                 mMap.clear();
 
                 mUserMarker = mMap.addMarker(new MarkerOptions()
-                                                            .position(place.getLatLng())
-                                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
-                                                            .title("Pickup Here."));
+                        .position(place.getLatLng())
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                        .title("Pickup Here."));
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
             }
@@ -225,9 +224,9 @@ public class Home extends AppCompatActivity
                 mPlaceDestination = place.getAddress().toString();
 
                 mMap.addMarker(new MarkerOptions()
-                                            .position(place.getLatLng())
-                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.destination_marker))
-                                            .title("Destination"));
+                        .position(place.getLatLng())
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.destination_marker))
+                        .title("Destination"));
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(place.getLatLng(), 15.0f));
 
@@ -251,11 +250,8 @@ public class Home extends AppCompatActivity
         switch (requestCode) {
             case MY_PERMISSION_REQUEST_CODE:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    if (checkPlayServices()) {
-                        buildGoogleApiClient();
-                        createLocationRequest();
-                        displayLocation();
-                    }
+                    createLocationRequest();
+                    displayLocation();
                 }
                 break;
         }
@@ -334,41 +330,25 @@ public class Home extends AppCompatActivity
                     markerDestination.remove();
 
                 markerDestination = mMap.addMarker(new MarkerOptions()
-                                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.destination_marker))
-                                                            .position(latLng)
-                                                            .title("Destination"));
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.destination_marker))
+                        .position(latLng)
+                        .title("Destination"));
 
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15.0f));
 
                 BottomSheetRiderFragment mBottomSheet = BottomSheetRiderFragment.newInstance(
-                                                                    String.format("%f, %f", mLastLocation.getLatitude(), mLastLocation.getLongitude()),
-                                                                    String.format("%f, %f", latLng.latitude, latLng.longitude),
-                                                                    true);
+                        String.format("%f, %f", Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()),
+                        String.format("%f, %f", latLng.latitude, latLng.longitude),
+                        true);
                 mBottomSheet.show(getSupportFragmentManager(), mBottomSheet.getTag());
             }
         });
-    }
 
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        displayLocation();
-        startLocationUpdates();
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        mLastLocation = location;
-        displayLocation();
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        fusedLocationProviderClient.requestLocationUpdates(mLocationRequest, locationCallback, Looper.myLooper());
     }
 
     private void setUpLocation() {
@@ -379,37 +359,10 @@ public class Home extends AppCompatActivity
                     android.Manifest.permission.ACCESS_FINE_LOCATION
             }, MY_PERMISSION_REQUEST_CODE);
         } else {
-            if (checkPlayServices()) {
-                buildGoogleApiClient();
-                createLocationRequest();
-                displayLocation();
-            }
+            buildLocationCallBack();
+            createLocationRequest();
+            displayLocation();
         }
-    }
-
-    private boolean checkPlayServices() {
-        int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-
-        if (resultCode != ConnectionResult.SUCCESS) {
-            if (GooglePlayServicesUtil.isUserRecoverableError(resultCode))
-                GooglePlayServicesUtil.getErrorDialog(resultCode, this, PLAY_SERVICES_RESOLUTION_REQUEST).show();
-            else {
-                Toast.makeText(this, "This Device is not Supported", Toast.LENGTH_SHORT).show();
-                finish();
-            }
-            return false;
-        }
-        return true;
-    }
-
-    private void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .build();
-
-                mGoogleApiClient.connect();
     }
 
     private void createLocationRequest() {
@@ -426,55 +379,70 @@ public class Home extends AppCompatActivity
             return;
         }
 
-        mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        if (mLastLocation != null) {
-            LatLng center = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-            // Heading: 0 - NorthSide, 90 - EastSide, 180 - SouthSide, 270 - WestSide
-            LatLng northSide = SphericalUtil.computeOffset(center, 100000, 0);
-            LatLng southSide = SphericalUtil.computeOffset(center, 100000, 180);
+        fusedLocationProviderClient.getLastLocation().addOnSuccessListener(new OnSuccessListener<Location>() {
+            @Override
+            public void onSuccess(Location location) {
+                Common.mLastLocation = location;
+                if (Common.mLastLocation != null) {
+                    LatLng center = new LatLng(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude());
+                    // Heading: 0 - NorthSide, 90 - EastSide, 180 - SouthSide, 270 - WestSide
+                    LatLng northSide = SphericalUtil.computeOffset(center, 100000, 0);
+                    LatLng southSide = SphericalUtil.computeOffset(center, 100000, 180);
 
-            LatLngBounds bounds = LatLngBounds.builder()
-                                            .include(northSide)
-                                            .include(southSide)
-                                            .build();
+                    LatLngBounds bounds = LatLngBounds.builder()
+                            .include(northSide)
+                            .include(southSide)
+                            .build();
 
-            place_location.setBoundsBias(bounds);
-            place_location.setFilter(typeFilter);
+                    place_location.setBoundsBias(bounds);
+                    place_location.setFilter(typeFilter);
 
-            place_destination.setBoundsBias(bounds);
-            place_destination.setFilter(typeFilter);
+                    place_destination.setBoundsBias(bounds);
+                    place_destination.setFilter(typeFilter);
 
-            driversAvailable = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
-            driversAvailable.addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    loadAllAvailableDrivers(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+                    driversAvailable = FirebaseDatabase.getInstance().getReference(Common.driver_tbl);
+                    driversAvailable.addValueEventListener(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+                            loadAllAvailableDrivers(new LatLng(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()));
+                        }
+
+                        @Override
+                        public void onCancelled(DatabaseError databaseError) {
+
+                        }
+                    });
+
+                    final double latitude = Common.mLastLocation.getLatitude();
+                    final double longitude = Common.mLastLocation.getLongitude();
+
+                    loadAllAvailableDrivers(new LatLng(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()));
+
+                    Log.d("CURRENT-LOCATION: ", String.format("Your Location was changed: %f / %f", latitude, longitude));
+                } else {
+                    Log.d("ERROR-LOCATION: ", "Cannot Get Your Location.");
                 }
+            }
+        });
+    }
 
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-
-                }
-            });
-
-            final double latitude = mLastLocation.getLatitude();
-            final double longitude = mLastLocation.getLongitude();
-
-            loadAllAvailableDrivers(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
-
-            Log.d("CURRENT-LOCATION: ", String.format("Your Location was changed: %f / %f", latitude, longitude));
-        } else {
-            Log.d("ERROR-LOCATION: ", "Cannot Get Your Location.");
-        }
+    private void buildLocationCallBack() {
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                Common.mLastLocation = locationResult.getLocations().get(locationResult.getLocations().size() - 1);
+                displayLocation();
+            }
+        };
     }
 
     private void loadAllAvailableDrivers(final LatLng location) {
         mMap.clear();
 
         mUserMarker = mMap.addMarker(new MarkerOptions()
-                                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
-                                            .position(location)
-                                            .title("You"));
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                .position(location)
+                .title("You"));
 
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(location, 15.0f));
 
@@ -488,7 +456,6 @@ public class Home extends AppCompatActivity
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
             @Override
             public void onKeyEntered(String key, final GeoLocation location) {
-                // Use key to get the Email from table "Users"
                 FirebaseDatabase.getInstance().getReference(Common.user_driver_tbl)
                         .child(key)
                         .addListenerForSingleValueEvent(new ValueEventListener() {
@@ -540,28 +507,18 @@ public class Home extends AppCompatActivity
         });
     }
 
-    private void startLocationUpdates() {
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-    }
-
     private void requestPickupHere(String uid) {
         DatabaseReference dbRequest = FirebaseDatabase.getInstance().getReference(Common.pickup_request_tbl);
         GeoFire mGeoFire = new GeoFire(dbRequest);
-        mGeoFire.setLocation(uid, new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+        mGeoFire.setLocation(uid, new GeoLocation(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()));
 
         if (mUserMarker.isVisible())
             mUserMarker.remove();
 
-        //  Add New Marker
         mUserMarker = mMap.addMarker(new MarkerOptions().title("Pickup Here")
-                            .snippet("")
-                            .position(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()))
-                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
+                .snippet("")
+                .position(new LatLng(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()))
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
         mUserMarker.showInfoWindow();
 
         btnPickupRequest.setText("Getting your Driver...");
@@ -574,7 +531,7 @@ public class Home extends AppCompatActivity
         GeoFire mGeoFireDrivers = new GeoFire(drivers);
 
         final GeoQuery geoQuery = mGeoFireDrivers.queryAtLocation(
-                new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), radius);
+                new GeoLocation(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()), radius);
 
         geoQuery.removeAllListeners();
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
@@ -628,7 +585,7 @@ public class Home extends AppCompatActivity
                         for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
                             Token token = postSnapshot.getValue(Token.class);
 
-                            String json_lat_lng = new Gson().toJson(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+                            String json_lat_lng = new Gson().toJson(new LatLng(Common.mLastLocation.getLatitude(), Common.mLastLocation.getLongitude()));
                             String riderToken = FirebaseInstanceId.getInstance().getToken();
 
                             Notification data = new Notification(riderToken, json_lat_lng);

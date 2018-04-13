@@ -1,5 +1,7 @@
 package rahul.nirmesh.grabaride.common;
 
+import android.location.Location;
+
 import rahul.nirmesh.grabaride.model.Rider;
 import rahul.nirmesh.grabaride.remote.FCMClient;
 import rahul.nirmesh.grabaride.remote.GoogleMapsAPI;
@@ -15,6 +17,8 @@ public class Common {
     public static String driverId = "";
 
     public static Rider currentRider = new Rider();
+
+    public static Location mLastLocation;
 
     public static final String driver_tbl = "Drivers";
     public static final String user_driver_tbl = "DriversInformation";
